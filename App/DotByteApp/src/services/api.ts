@@ -167,6 +167,53 @@ class ApiService {
     }
   }
 
+  async uploadMovieWithProgress(
+    formData: FormData, 
+    onProgress: (progress: number) => void
+  ): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const progress = event.loaded / event.total;
+            onProgress(progress);
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onProgress(1.0); // 100% complete
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status: ${xhr.status}`));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Upload failed - network error'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload was cancelled'));
+        });
+
+        xhr.open('POST', `${API_BASE_URL}/movies/upload`);
+        
+        // Set authorization header if available
+        const headers = await this.getHeaders();
+        if (headers.Authorization) {
+          xhr.setRequestHeader('Authorization', headers.Authorization);
+        }
+
+        xhr.send(formData);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
   async getAdminStats(): Promise<{
     totalMovies: number;
     totalViews: number;

@@ -58,7 +58,8 @@ const AdminScreen: React.FC = () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'video/*',
-        copyToCacheDirectory: true,
+        copyToCacheDirectory: false, // Don't copy large files to cache
+        multiple: false,
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
@@ -79,6 +80,15 @@ const AdminScreen: React.FC = () => {
   };
 
   const uploadMovie = async (file: DocumentPicker.DocumentPickerAsset) => {
+    // Get movie metadata from user first
+    const movieTitle = await promptForText('Movie Title', `Enter title for ${file.name}:`);
+    if (!movieTitle) {
+      return;
+    }
+
+    const movieDescription = await promptForText('Description (Optional)', 'Enter movie description:');
+    const movieGenre = await promptForText('Genre (Optional)', 'Enter movie genre:');
+
     setUploadProgress({
       isUploading: true,
       progress: 0,
@@ -93,31 +103,17 @@ const AdminScreen: React.FC = () => {
         name: file.name,
       } as any);
 
-      // Get movie metadata from user
-      const movieTitle = await promptForText('Movie Title', `Enter title for ${file.name}:`);
-      if (!movieTitle) {
-        setUploadProgress({ isUploading: false, progress: 0 });
-        return;
-      }
-
-      const movieDescription = await promptForText('Description (Optional)', 'Enter movie description:');
-      const movieGenre = await promptForText('Genre (Optional)', 'Enter movie genre:');
-
       formData.append('title', movieTitle);
       if (movieDescription) formData.append('description', movieDescription);
       if (movieGenre) formData.append('genre', movieGenre);
 
-      // Simulate upload progress for better UX
-      const progressInterval = setInterval(() => {
+      await apiService.uploadMovieWithProgress(formData, (progress) => {
         setUploadProgress(prev => ({
           ...prev,
-          progress: Math.min(prev.progress + 10, 90),
+          progress: Math.round(progress * 100),
         }));
-      }, 500);
+      });
 
-      await apiService.uploadMovie(formData);
-
-      clearInterval(progressInterval);
       setUploadProgress({
         isUploading: false,
         progress: 100,

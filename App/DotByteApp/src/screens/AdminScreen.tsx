@@ -9,6 +9,9 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -37,6 +40,11 @@ const AdminScreen: React.FC = () => {
   });
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [movieTitle, setMovieTitle] = useState('');
+  const [movieDescription, setMovieDescription] = useState('');
+  const [movieGenre, setMovieGenre] = useState('');
 
   useEffect(() => {
     loadStats();
@@ -58,20 +66,23 @@ const AdminScreen: React.FC = () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'video/*',
-        copyToCacheDirectory: false, // Don't copy large files to cache
+        copyToCacheDirectory: false,
         multiple: false,
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const file = result.assets[0];
         
-        // Basic validation
         if (!file.mimeType?.startsWith('video/')) {
           Alert.alert('Error', 'Please select a video file');
           return;
         }
 
-        await uploadMovie(file);
+        setPendingFile(file);
+        setMovieTitle('');
+        setMovieDescription('');
+        setMovieGenre('');
+        setShowMetadataModal(true);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick file');
@@ -79,28 +90,26 @@ const AdminScreen: React.FC = () => {
     }
   };
 
-  const uploadMovie = async (file: DocumentPicker.DocumentPickerAsset) => {
-    // Get movie metadata from user first
-    const movieTitle = await promptForText('Movie Title', `Enter title for ${file.name}:`);
-    if (!movieTitle) {
+  const handleUploadConfirm = async () => {
+    if (!pendingFile || !movieTitle.trim()) {
+      Alert.alert('Error', 'Movie title is required');
       return;
     }
 
-    const movieDescription = await promptForText('Description (Optional)', 'Enter movie description:');
-    const movieGenre = await promptForText('Genre (Optional)', 'Enter movie genre:');
-
+    setShowMetadataModal(false);
+    
     setUploadProgress({
       isUploading: true,
       progress: 0,
-      fileName: file.name,
+      fileName: pendingFile.name,
     });
 
     try {
       const formData = new FormData();
       formData.append('movie', {
-        uri: file.uri,
-        type: file.mimeType || 'video/mp4',
-        name: file.name,
+        uri: pendingFile.uri,
+        type: pendingFile.mimeType || 'video/mp4',
+        name: pendingFile.name,
       } as any);
 
       formData.append('title', movieTitle);
@@ -119,38 +128,17 @@ const AdminScreen: React.FC = () => {
         progress: 100,
       });
 
-      Alert.alert(
-        'Success',
-        'Movie uploaded successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setUploadProgress({ isUploading: false, progress: 0 });
-              loadStats(); // Refresh stats
-            },
-          },
-        ]
-      );
+      setTimeout(() => {
+        setUploadProgress({ isUploading: false, progress: 0 });
+        Alert.alert('Success', 'Movie uploaded successfully!');
+        setPendingFile(null);
+        loadStats();
+      }, 1000);
     } catch (error) {
       setUploadProgress({ isUploading: false, progress: 0 });
       Alert.alert('Upload Failed', error instanceof Error ? error.message : 'An error occurred');
       console.error('Upload error:', error);
     }
-  };
-
-  const promptForText = (title: string, message: string): Promise<string | null> => {
-    return new Promise((resolve) => {
-      Alert.prompt(
-        title,
-        message,
-        [
-          { text: 'Cancel', onPress: () => resolve(null), style: 'cancel' },
-          { text: 'OK', onPress: (text) => resolve(text || null) },
-        ],
-        'plain-text'
-      );
-    });
   };
 
   const scanMovieDirectory = async () => {
@@ -224,59 +212,113 @@ const AdminScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  if (!user?.isAdmin) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="shield-outline" size={60} color="#e50914" />
-          <Text style={styles.errorText}>Access Denied</Text>
-          <Text style={styles.errorSubtext}>Admin privileges required</Text>
+  const MetadataModal = () => (
+    <Modal
+      visible={showMetadataModal}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowMetadataModal(false)}
+    >
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Movie Details</Text>
+          <Text style={styles.modalSubtitle}>{pendingFile?.name}</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Title *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter movie title"
+              value={movieTitle}
+              onChangeText={setMovieTitle}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Enter movie description (optional)"
+              value={movieDescription}
+              onChangeText={setMovieDescription}
+              multiline={true}
+              numberOfLines={3}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Genre</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter genre (optional)"
+              value={movieGenre}
+              onChangeText={setMovieGenre}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <View style={styles.modalButtons}>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => {
+                setShowMetadataModal(false);
+                setPendingFile(null);
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton]}
+              onPress={handleUploadConfirm}
+            >
+              <Text style={styles.confirmButtonText}>Upload</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </SafeAreaView>
-    );
-  }
+      </KeyboardAvoidingView>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header */}
+      {/* Upload Progress Notification */}
+      {uploadProgress.isUploading && (
+        <View style={styles.uploadNotification}>
+          <View style={styles.uploadNotificationContent}>
+            <Ionicons name="cloud-upload" size={20} color="#fff" />
+            <View style={styles.uploadNotificationText}>
+              <Text style={styles.uploadNotificationTitle}>Uploading: {uploadProgress.fileName}</Text>
+              <View style={styles.progressBar}>
+                <View 
+                  style={[styles.progressFill, { width: `${uploadProgress.progress}%` }]}
+                />
+              </View>
+            </View>
+            <Text style={styles.progressText}>{uploadProgress.progress}%</Text>
+          </View>
+        </View>
+      )}
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.title}>Admin Dashboard</Text>
           <Text style={styles.subtitle}>Manage your DotByte content</Text>
         </View>
 
-        {/* Upload Progress */}
-        {uploadProgress.isUploading && (
-          <View style={styles.uploadProgressContainer}>
-            <Text style={styles.uploadProgressTitle}>
-              Uploading {uploadProgress.fileName}...
-            </Text>
-            <View style={styles.progressBarContainer}>
-              <View
-                style={[
-                  styles.progressBar,
-                  { width: `${uploadProgress.progress}%` },
-                ]}
-              />
-            </View>
-            <Text style={styles.uploadProgressText}>
-              {uploadProgress.progress}%
-            </Text>
-          </View>
-        )}
-
-        {/* Stats Section */}
+        {/* Statistics Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Overview</Text>
+          <Text style={styles.sectionTitle}>Statistics</Text>
           {isLoadingStats ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#e50914" />
-              <Text style={styles.loadingText}>Loading stats...</Text>
-            </View>
+            <ActivityIndicator size="large" color="#e50914" />
           ) : stats ? (
-            <View style={styles.statsContainer}>
+            <View style={styles.statsGrid}>
               <StatCard
-                icon="film"
+                icon="videocam"
                 title="Total Movies"
                 value={stats.totalMovies}
                 color="#e50914"
@@ -285,19 +327,19 @@ const AdminScreen: React.FC = () => {
                 icon="eye"
                 title="Total Views"
                 value={stats.totalViews}
-                color="#1db954"
+                color="#4CAF50"
               />
               <StatCard
                 icon="people"
                 title="Active Users"
                 value={stats.activeUsers}
-                color="#ff6b6b"
+                color="#2196F3"
               />
               <StatCard
                 icon="server"
                 title="Storage Used"
                 value={formatFileSize(stats.storageUsed)}
-                color="#4ecdc4"
+                color="#FF9800"
               />
             </View>
           ) : (
@@ -307,32 +349,31 @@ const AdminScreen: React.FC = () => {
 
         {/* Actions Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Actions</Text>
-          
-          <ActionButton
-            icon="cloud-upload"
-            title="Upload Movie"
-            subtitle="Upload a new movie file"
-            onPress={pickAndUploadFile}
-            color="#e50914"
-            disabled={uploadProgress.isUploading}
-          />
-
-          <ActionButton
-            icon="folder-open"
-            title="Scan Directory"
-            subtitle="Scan server directory for new files"
-            onPress={scanMovieDirectory}
-            color="#1db954"
-          />
-
-          <ActionButton
-            icon="refresh"
-            title="Refresh Stats"
-            subtitle="Update dashboard statistics"
-            onPress={loadStats}
-            color="#4ecdc4"
-          />
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionsContainer}>
+            <ActionButton
+              icon="cloud-upload"
+              title="Upload Movie"
+              subtitle="Select video from device"
+              onPress={pickAndUploadFile}
+              color="#e50914"
+              disabled={uploadProgress.isUploading}
+            />
+            <ActionButton
+              icon="scan"
+              title="Scan Directory"
+              subtitle="Check for new files on server"
+              onPress={scanMovieDirectory}
+              color="#4CAF50"
+            />
+            <ActionButton
+              icon="refresh"
+              title="Refresh Stats"
+              subtitle="Update dashboard data"
+              onPress={loadStats}
+              color="#2196F3"
+            />
+          </View>
         </View>
 
         {/* Info Section */}
@@ -351,6 +392,9 @@ const AdminScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+      
+      {/* Metadata Modal */}
+      <MetadataModal />
     </SafeAreaView>
   );
 };
@@ -360,133 +404,121 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  scrollView: {
-    flex: 1,
+  uploadNotification: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#1a1a1a',
+    zIndex: 1000,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  uploadNotificationContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 12,
   },
-  errorText: {
+  uploadNotificationText: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 12,
+  },
+  uploadNotificationTitle: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 15,
-  },
-  errorSubtext: {
-    color: '#999',
     fontSize: 14,
-    marginTop: 5,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#333',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#e50914',
+  },
+  progressText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   header: {
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    paddingTop: 30,
   },
   title: {
-    color: '#fff',
     fontSize: 28,
     fontWeight: 'bold',
+    color: '#fff',
     marginBottom: 5,
   },
   subtitle: {
-    color: '#999',
     fontSize: 16,
-  },
-  uploadProgressContainer: {
-    margin: 20,
-    padding: 20,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#e50914',
-  },
-  uploadProgressTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  progressBarContainer: {
-    height: 6,
-    backgroundColor: '#333',
-    borderRadius: 3,
-    marginBottom: 10,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#e50914',
-    borderRadius: 3,
-  },
-  uploadProgressText: {
     color: '#999',
-    fontSize: 14,
-    textAlign: 'right',
   },
   section: {
-    marginBottom: 30,
+    marginBottom: 25,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
-    color: '#fff',
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: '#fff',
     marginBottom: 15,
-    paddingHorizontal: 20,
   },
-  loadingContainer: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    color: '#999',
-    marginTop: 10,
-  },
-  statsContainer: {
+  statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 20,
+    justifyContent: 'space-between',
   },
   statCard: {
     width: '48%',
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
     padding: 15,
-    marginBottom: 10,
-    marginRight: '2%',
+    marginBottom: 15,
     flexDirection: 'row',
     alignItems: 'center',
   },
   statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+    width: 45,
+    height: 45,
+    borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
   statContent: {
     flex: 1,
   },
   statValue: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#fff',
   },
   statTitle: {
-    color: '#999',
     fontSize: 12,
+    color: '#999',
     marginTop: 2,
+  },
+  actionsContainer: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderRadius: 12,
     padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
   },
   actionButtonDisabled: {
     opacity: 0.5,
@@ -494,35 +526,114 @@ const styles = StyleSheet.create({
   actionIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+    borderRadius: 8,
     alignItems: 'center',
-    marginRight: 15,
+    justifyContent: 'center',
+    marginRight: 12,
   },
   actionContent: {
     flex: 1,
   },
   actionTitle: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '500',
+    color: '#fff',
   },
   actionSubtitle: {
+    fontSize: 13,
     color: '#999',
-    fontSize: 14,
     marginTop: 2,
   },
   infoContainer: {
     backgroundColor: '#1a1a1a',
-    marginHorizontal: 20,
     borderRadius: 12,
     padding: 15,
   },
   infoText: {
-    color: '#ccc',
     fontSize: 14,
+    color: '#999',
     marginBottom: 8,
     lineHeight: 20,
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: 14,
+    textAlign: 'center',
+    padding: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#999',
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 15,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#fff',
+    marginBottom: 5,
+  },
+  input: {
+    backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    padding: 12,
+    color: '#fff',
+    fontSize: 14,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#333',
+    marginRight: 10,
+  },
+  confirmButton: {
+    backgroundColor: '#e50914',
+    marginLeft: 10,
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

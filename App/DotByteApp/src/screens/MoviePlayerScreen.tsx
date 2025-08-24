@@ -264,8 +264,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 120,
-    backgroundColor: 'transparent',
-    background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
   bottomGradient: {
     position: 'absolute',
@@ -273,8 +272,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 120,
-    backgroundColor: 'transparent',
-    background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
 });
 

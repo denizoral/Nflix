@@ -70,13 +70,6 @@ const AdminScreen: React.FC = () => {
           return;
         }
 
-        // Check file size (limit to 500MB for mobile)
-        const maxSize = 500 * 1024 * 1024; // 500MB
-        if (file.size && file.size > maxSize) {
-          Alert.alert('Error', 'File size must be less than 500MB for mobile upload');
-          return;
-        }
-
         await uploadMovie(file);
       }
     } catch (error) {
@@ -351,13 +344,13 @@ const AdminScreen: React.FC = () => {
           <Text style={styles.sectionTitle}>Information</Text>
           <View style={styles.infoContainer}>
             <Text style={styles.infoText}>
-              • Mobile uploads are limited to 500MB
-            </Text>
-            <Text style={styles.infoText}>
               • Supported formats: MP4, MOV, AVI, MKV
             </Text>
             <Text style={styles.infoText}>
               • Files are uploaded to your DotByte server
+            </Text>
+            <Text style={styles.infoText}>
+              • No file size restrictions on mobile uploads
             </Text>
           </View>
         </View>

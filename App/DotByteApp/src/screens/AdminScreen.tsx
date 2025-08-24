@@ -64,18 +64,14 @@ const AdminScreen: React.FC = () => {
 
   const pickAndUploadFile = async () => {
     try {
-      console.log('Starting file picker...');
       const result = await DocumentPicker.getDocumentAsync({
         type: 'video/*',
         copyToCacheDirectory: false,
         multiple: false,
       });
 
-      console.log('File picker result:', result);
-
       if (!result.canceled && result.assets && result.assets[0]) {
         const file = result.assets[0];
-        console.log('Selected file:', file.name, 'Size:', file.size);
         
         // Check if it's a video file
         if (file.mimeType && !file.mimeType.startsWith('video/')) {
@@ -84,18 +80,14 @@ const AdminScreen: React.FC = () => {
         }
 
         // Set file and show modal
-        console.log('Setting pending file and showing modal...');
         setPendingFile(file);
         setMovieTitle('');
         setMovieDescription('');
         setMovieGenre('');
         setShowMetadataModal(true);
-        console.log('Modal should be visible now');
-      } else {
-        console.log('File selection cancelled');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick file: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      Alert.alert('Error', 'Failed to pick file');
       console.error('File picker error:', error);
     }
   };
@@ -332,17 +324,16 @@ const AdminScreen: React.FC = () => {
         </View>
       </ScrollView>
       
-      {/* Metadata Modal - Always render */}
-      {showMetadataModal && (
-        <Modal
-          visible={true}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => {
-            setShowMetadataModal(false);
-            setPendingFile(null);
-          }}
-        >
+      {/* Metadata Modal - Render once, control visibility */}
+      <Modal
+        visible={showMetadataModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setShowMetadataModal(false);
+          setPendingFile(null);
+        }}
+      >
           <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalOverlay}
@@ -406,7 +397,6 @@ const AdminScreen: React.FC = () => {
             </View>
           </KeyboardAvoidingView>
         </Modal>
-      )}
     </SafeAreaView>
   );
 };

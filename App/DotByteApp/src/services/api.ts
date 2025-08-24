@@ -171,47 +171,42 @@ class ApiService {
     formData: FormData, 
     onProgress: (progress: number) => void
   ): Promise<void> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const xhr = new XMLHttpRequest();
-
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            const progress = event.loaded / event.total;
-            onProgress(progress);
-          }
-        });
-
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            onProgress(1.0); // 100% complete
-            resolve();
-          } else {
-            reject(new Error(`Upload failed with status: ${xhr.status}`));
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          reject(new Error('Upload failed - network error'));
-        });
-
-        xhr.addEventListener('abort', () => {
-          reject(new Error('Upload was cancelled'));
-        });
-
-        xhr.open('POST', `${API_BASE_URL}/movies/upload`);
-        
-        // Set authorization header if available
-        const headers = await this.getHeaders();
-        if (headers.Authorization) {
-          xhr.setRequestHeader('Authorization', headers.Authorization);
-        }
-
-        xhr.send(formData);
-      } catch (error) {
-        reject(error);
+    try {
+      // Start progress immediately
+      onProgress(0.05);
+      
+      // Use fetch API for React Native compatibility
+      const response = await fetch(`${API_BASE_URL}/movies/upload`, {
+        method: 'POST',
+        headers: {
+          ...(await this.getHeaders()).Authorization && { Authorization: (await this.getHeaders()).Authorization },
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Upload failed with status: ${response.status}`);
       }
-    });
+      
+      // Since React Native fetch doesn't support upload progress natively,
+      // we show incremental progress for better UX
+      let progress = 0.1;
+      const interval = setInterval(() => {
+        progress = Math.min(progress + 0.15, 0.9);
+        onProgress(progress);
+      }, 300);
+      
+      // Wait for server response
+      await response.text();
+      clearInterval(interval);
+      
+      // Upload complete
+      onProgress(1.0);
+    } catch (error) {
+      console.error('Upload error:', error);
+      throw error;
+    }
   }
 
   async getAdminStats(): Promise<{

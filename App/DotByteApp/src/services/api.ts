@@ -150,6 +150,49 @@ class ApiService {
     return `${API_BASE_URL}/movies/${movieId}/stream`;
   }
 
+  // Admin methods
+  async uploadMovie(formData: FormData): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/movies/upload`, {
+      method: 'POST',
+      headers: {
+        // Don't set Content-Type for FormData, let browser set it with boundary
+        ...(await this.getHeaders()).Authorization && { Authorization: (await this.getHeaders()).Authorization },
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || `HTTP error! status: ${response.status}`);
+    }
+  }
+
+  async getAdminStats(): Promise<{
+    totalMovies: number;
+    totalViews: number;
+    activeUsers: number;
+    storageUsed: number;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/analytics/stats`, {
+      method: 'GET',
+      headers: await this.getHeaders(),
+    });
+    
+    return await this.handleResponse(response);
+  }
+
+  async scanMovieDirectory(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/movies/scan`, {
+      method: 'POST',
+      headers: await this.getHeaders(),
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || `HTTP error! status: ${response.status}`);
+    }
+  }
+
   // Check stored user
   async getStoredUser(): Promise<User | null> {
     try {

@@ -13,6 +13,7 @@ import HomeScreen from '../screens/HomeScreen';
 import MoviesScreen from '../screens/MoviesScreen';
 import MoviePlayerScreen from '../screens/MoviePlayerScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import AdminScreen from '../screens/AdminScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 
 // Navigation types
@@ -27,6 +28,7 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Movies: undefined;
+  Admin: undefined;
   Profile: undefined;
 };
 
@@ -43,44 +45,53 @@ const AuthStack = () => (
   </Stack.Navigator>
 );
 
-const MainTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      tabBarIcon: ({ focused, color, size }) => {
-        let iconName: keyof typeof Ionicons.glyphMap;
+const MainTabs = () => {
+  const { user } = useAuth();
+  
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: keyof typeof Ionicons.glyphMap;
 
-        if (route.name === 'Home') {
-          iconName = focused ? 'home' : 'home-outline';
-        } else if (route.name === 'Movies') {
-          iconName = focused ? 'film' : 'film-outline';
-        } else if (route.name === 'Profile') {
-          iconName = focused ? 'person' : 'person-outline';
-        } else {
-          iconName = 'ellipse';
-        }
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Movies') {
+            iconName = focused ? 'film' : 'film-outline';
+          } else if (route.name === 'Admin') {
+            iconName = focused ? 'settings' : 'settings-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'person' : 'person-outline';
+          } else {
+            iconName = 'ellipse';
+          }
 
-        return <Ionicons name={iconName} size={size} color={color} />;
-      },
-      tabBarActiveTintColor: '#e50914',
-      tabBarInactiveTintColor: 'gray',
-      tabBarStyle: {
-        backgroundColor: '#000',
-        borderTopColor: '#333',
-      },
-      headerStyle: {
-        backgroundColor: '#000',
-      },
-      headerTintColor: '#fff',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-      },
-    })}
-  >
-    <Tab.Screen name="Home" component={HomeScreen} />
-    <Tab.Screen name="Movies" component={MoviesScreen} />
-    <Tab.Screen name="Profile" component={ProfileScreen} />
-  </Tab.Navigator>
-);
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#e50914',
+        tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          backgroundColor: '#000',
+          borderTopColor: '#333',
+        },
+        headerStyle: {
+          backgroundColor: '#000',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Movies" component={MoviesScreen} />
+      {user?.isAdmin && (
+        <Tab.Screen name="Admin" component={AdminScreen} />
+      )}
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+};
 
 export const AppNavigator: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -99,7 +110,7 @@ export const AppNavigator: React.FC = () => {
               name="MoviePlayer" 
               component={MoviePlayerScreen}
               options={{ 
-                presentation: 'fullScreenModal',
+                presentation: 'modal',
                 headerShown: false 
               }}
             />

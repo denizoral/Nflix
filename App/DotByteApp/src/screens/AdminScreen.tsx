@@ -64,28 +64,38 @@ const AdminScreen: React.FC = () => {
 
   const pickAndUploadFile = async () => {
     try {
+      console.log('Starting file picker...');
       const result = await DocumentPicker.getDocumentAsync({
         type: 'video/*',
         copyToCacheDirectory: false,
         multiple: false,
       });
 
+      console.log('File picker result:', result);
+
       if (!result.canceled && result.assets && result.assets[0]) {
         const file = result.assets[0];
+        console.log('Selected file:', file.name, 'Size:', file.size);
         
-        if (!file.mimeType?.startsWith('video/')) {
+        // Check if it's a video file
+        if (file.mimeType && !file.mimeType.startsWith('video/')) {
           Alert.alert('Error', 'Please select a video file');
           return;
         }
 
+        // Set file and show modal
+        console.log('Setting pending file and showing modal...');
         setPendingFile(file);
         setMovieTitle('');
         setMovieDescription('');
         setMovieGenre('');
         setShowMetadataModal(true);
+        console.log('Modal should be visible now');
+      } else {
+        console.log('File selection cancelled');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick file');
+      Alert.alert('Error', 'Failed to pick file: ' + (error instanceof Error ? error.message : 'Unknown error'));
       console.error('File picker error:', error);
     }
   };
@@ -212,77 +222,6 @@ const AdminScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const MetadataModal = () => (
-    <Modal
-      visible={showMetadataModal}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={() => setShowMetadataModal(false)}
-    >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalOverlay}
-      >
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Movie Details</Text>
-          <Text style={styles.modalSubtitle}>{pendingFile?.name}</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Title *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter movie title"
-              value={movieTitle}
-              onChangeText={setMovieTitle}
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Enter movie description (optional)"
-              value={movieDescription}
-              onChangeText={setMovieDescription}
-              multiline={true}
-              numberOfLines={3}
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Genre</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter genre (optional)"
-              value={movieGenre}
-              onChangeText={setMovieGenre}
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => {
-                setShowMetadataModal(false);
-                setPendingFile(null);
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.confirmButton]}
-              onPress={handleUploadConfirm}
-            >
-              <Text style={styles.confirmButtonText}>Upload</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -393,8 +332,81 @@ const AdminScreen: React.FC = () => {
         </View>
       </ScrollView>
       
-      {/* Metadata Modal */}
-      <MetadataModal />
+      {/* Metadata Modal - Always render */}
+      {showMetadataModal && (
+        <Modal
+          visible={true}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => {
+            setShowMetadataModal(false);
+            setPendingFile(null);
+          }}
+        >
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Movie Details</Text>
+              <Text style={styles.modalSubtitle}>{pendingFile?.name}</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Title *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter movie title"
+                  value={movieTitle}
+                  onChangeText={setMovieTitle}
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Enter movie description (optional)"
+                  value={movieDescription}
+                  onChangeText={setMovieDescription}
+                  multiline={true}
+                  numberOfLines={3}
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Genre</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter genre (optional)"
+                  value={movieGenre}
+                  onChangeText={setMovieGenre}
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowMetadataModal(false);
+                    setPendingFile(null);
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.confirmButton]}
+                  onPress={handleUploadConfirm}
+                >
+                  <Text style={styles.confirmButtonText}>Upload</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };
